@@ -6,6 +6,9 @@ import json
 import os
 import re
 import sys
+import socket
+import ssl
+import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
@@ -13,6 +16,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlencode, urljoin, urlsplit, urlunsplit
 from urllib.request import Request, build_opener, HTTPRedirectHandler, urlopen
+from urllib.error import HTTPError, URLError
 
 ROOT = Path(__file__).resolve().parent
 CST = timezone(timedelta(hours=8))
@@ -66,7 +70,12 @@ def canonical(base, href):
     if p.scheme not in ("http", "https") or not p.hostname:
         return None
     host = p.hostname.lower()
-    if not (host.endswith(".gov.cn") or host in ("www.shzfgjj.cn", "www.scsjgjj.cn")):
+    local_hosts = {"sh.bendibao.com", "m.sh.bendibao.com", "cd.bendibao.com", "m.cd.bendibao.com"}
+    if host in local_hosts:
+        origin = urlsplit(base).hostname or ""
+        if origin not in local_hosts or origin.removeprefix("m.") != host.removeprefix("m."):
+            return None
+    if not (host.endswith(".gov.cn") or host in ("www.shzfgjj.cn", "www.scsjgjj.cn") or host in local_hosts):
         return None
     return urlunsplit((p.scheme, p.netloc, p.path, p.query, ""))
 
@@ -81,14 +90,38 @@ def extract_articles(source, text):
             continue
         path = urlsplit(url).path.lower()
         # Exclude navigation, listing pages and downloads rather than claiming to read them.
-        if not re.search(r"\.(s?html?|htm)$", path) or re.search(r"/(index|list)[^/]*\.", path):
+        extra = source.get("article_pattern")
+        is_article = bool(re.search(r"\.(s?html?|htm)$", path)) or bool(extra and re.search(extra, url, re.I))
+        if not is_article or re.search(r"/(index|list)[^/]*\.", path):
             continue
         title = re.sub(r"\s*20\d{2}[-./年]\d{1,2}[-./月]\d{1,2}日?\s*$", "", title).strip()
-        result[url] = {"url": url, "title": title}
+        result[url] = {"url": url, "title": title,
+                       "source_type": source.get("source_type", "official"),
+                       "city": source.get("city", "")}
     return list(result.values())
 
 
+def connection_error(error):
+    if isinstance(error, HTTPError):
+        return "HTTP " + str(error.code)
+    reason = error.reason if isinstance(error, URLError) else error
+    if isinstance(reason, ssl.SSLError):
+        return "TLS证书或握手失败"
+    if isinstance(reason, (TimeoutError, socket.timeout)):
+        return "连接或读取超时"
+    if isinstance(reason, socket.gaierror):
+        return "DNS域名解析失败"
+    return type(reason).__name__
+
+
+def decode_page(raw, header_charset=None):
+    match = re.search(br"charset\s*=\s*[\"']?([a-zA-Z0-9_-]+)", raw[:8192])
+    charset = header_charset or (match.group(1).decode("ascii") if match else "utf-8")
+    return raw.decode(charset, errors="replace")
+
+
 def fetch_source(source):
+    failure = "未知连接错误"
     for attempt in range(2):
         try:
             request = Request(source["url"], headers={"User-Agent": "Mozilla/5.0 (compatible; PersonalPolicyMonitor/1.0)"})
@@ -97,17 +130,34 @@ def fetch_source(source):
                 if len(raw) > MAX_BYTES:
                     raise ValueError("oversize")
                 header_charset = response.headers.get_content_charset()
-            match = re.search(br"charset\s*=\s*[\"']?([a-zA-Z0-9_-]+)", raw[:8192])
-            charset = header_charset or (match.group(1).decode("ascii") if match else "utf-8")
-            text = raw.decode(charset, errors="replace")
+            text = decode_page(raw, header_charset)
             items = extract_articles(source, text)
             if len(items) < 3:
                 return source, [], "未读取到足够文章：可能为动态网页、验证码或栏目结构变化"
             return source, items, None
-        except Exception:
+        except Exception as error:
+            failure = connection_error(error)
             if attempt == 0:
                 time.sleep(1)
-    return source, [], "连接失败或网页无法解析（已重试）；不能视为没有政策变化"
+    if source.get("use_curl_fallback"):
+        # Different verified TLS implementation; never disable certificate checks.
+        try:
+            response = subprocess.run([
+                "curl", "--silent", "--show-error", "--fail", "--location",
+                "--proto", "=https", "--proto-redir", "=https", "--compressed",
+                "--connect-timeout", "15", "--max-time", "40", "--max-filesize", str(MAX_BYTES),
+                "--user-agent", "Mozilla/5.0", source["url"]
+            ], capture_output=True, timeout=45, check=False)
+            if response.returncode == 0 and len(response.stdout) <= MAX_BYTES:
+                items = extract_articles(source, decode_page(response.stdout))
+                if len(items) >= 3:
+                    return source, items, None
+                failure += "；备用读取未获得足够文章"
+            else:
+                failure += "；curl退出码 " + str(response.returncode)
+        except Exception as error:
+            failure += "；备用读取 " + type(error).__name__
+    return source, [], "读取失败（已重试）：" + failure + "；不能视为没有政策变化"
 
 
 def identity(item):
@@ -150,6 +200,24 @@ def safe_text(text):
     return re.sub(r"[\[\]<>*\x00-\x1f]", "", text)
 
 
+def seasonal_reminders(config, now):
+    values = {"year": now.year, "previous_year": now.year - 1, "next_year": now.year + 1}
+    completed = set(config.get("completed_tasks", []))
+    result = []
+    for rule in config.get("calendar", []):
+        if now.month not in rule["months"]:
+            continue
+        task_key = rule["id"] + ":" + str(now.year)
+        if task_key in completed:
+            continue
+        cadence = str(now.year) if rule.get("once_per_year") else now.strftime("%Y-%m")
+        result.append({**rule, "key": rule["id"] + ":" + cadence,
+                       "title": rule["title"].format(**values),
+                       "action": rule["action"].format(**values),
+                       "timing": rule["timing"].format(**values)})
+    return result
+
+
 def scan(root=ROOT, force=False):
     config = read_json(root / "config.json", {})
     state_path = root / "data/state.json"
@@ -157,11 +225,13 @@ def scan(root=ROOT, force=False):
     now = datetime.now(CST)
     stamp = now.strftime("%Y-%m-%d %H:%M:%S")
     month = now.strftime("%Y-%m")
+    reminders = seasonal_reminders(config, now)
+    pending_reminders = [r for r in reminders if r["key"] not in state.get("calendar_enqueued", {})]
     # Do not overwrite an undelivered digest; deliver it before collecting again.
     if state.get("outbox"):
         print("An earlier digest is pending; delivery will be retried first.")
         return
-    if not force and state.get("complete_month") == month:
+    if not force and state.get("complete_month") == month and not pending_reminders:
         print("This month's scan already completed. No repeat scan needed.")
         return
     with ThreadPoolExecutor(max_workers=4) as pool:
@@ -174,6 +244,13 @@ def scan(root=ROOT, force=False):
     for source, items, error in results:
         status = error or ("已读取 " + str(len(items)) + " 个文章链接")
         lines.append("- " + safe_text(source["name"]) + "：" + status)
+    lines += ["", "## 本月办事提醒（不要求出现新政策）", ""]
+    if not reminders:
+        lines.append("已配置日历中没有本月待提醒事项；不代表没有其他办理期限。")
+    for reminder in reminders:
+        lines += ["", "### " + reminder["title"], "", "时间性质：" + reminder["timing"],
+                  "", "建议行动：" + reminder["action"], "", "官方依据/查询入口：" + reminder["source"],
+                  "", "规则核验日期：" + reminder["verified_on"] + "；执行前核对当年度通知。"]
     lines += ["", "## 新发现的待核实线索", ""]
     if not hits:
         lines.append("本次未发现新增且标题命中规则的线索；不表示不存在适用政策或所有来源均已检查成功。")
@@ -183,6 +260,10 @@ def scan(root=ROOT, force=False):
                   "发现时间：" + stamp + "（不是发布日期或生效日期）", "",
                   "关联原因：" + "；".join(c["reason"] for c in item["categories"]), "",
                   "下一步：打开官方原文核实适用范围、材料、生效日和截止日；本程序不作资格认定。"]
+        if item.get("source_type") == "secondary":
+            lines += ["", "来源性质：本地宝为第三方信息线索，尚未逐条核实官方原文。",
+                      "活动参与前：核对举办时间、地点、费用、报名截止和余量；这些字段本程序未自动提取，不能据此认定活动仍可报名。",
+                      "政策办理前：继续查发文机关或官方办事入口，不把第三方解读视为资格认定。"]
     if baselines:
         lines += ["", "## 首次读取的来源", "",
                   "以下来源本次只建立历史基线，已有文章不会作为新政策推送。之后发现的新链接或标题变化才触发提醒。",
@@ -202,24 +283,36 @@ def scan(root=ROOT, force=False):
     error_signature = month + "|" + "|".join(sorted(failed))
     alert_error = bool(failed) and error_signature != state.get("last_error_alert")
     recovered = not failed and bool(state.get("last_failed"))
-    if hits or initial_run or alert_error or recovered:
+    if hits or initial_run or alert_error or recovered or pending_reminders:
         title = ("政策小灵通：首次监测记录" if initial_run else
                  "政策小灵通：" + (str(len(hits)) + "条待核实线索" if hits else
-                               ("部分来源读取失败" if failed else "来源读取已恢复")))
+                               ("本月办事提醒" if pending_reminders else
+                                ("部分来源读取失败" if failed else "来源读取已恢复"))))
         body = ["北京时间：" + stamp, "",
                 "成功读取 " + str(len(results) - len(failed)) + "/" + str(len(results)) + " 个来源。", ""]
         if initial_run:
             body += ["本次建立基线，不把既有文章当作新政策。每月1日检查，2日和3日用于失败补查。",
                      "已有政策线索见完整报告；此通知不代表所有来源均已通过验证。", ""]
         for item in hits[:8]:
-            body += ["- " + safe_text(item["title"]), "  " + item["url"]]
+            label = (item.get("city", "") + "·本地宝待核实线索：") if item.get("source_type") == "secondary" else ""
+            body += ["- " + label + safe_text(item["title"]), "  " + item["url"]]
+        if any(item.get("source_type") == "secondary" for item in hits):
+            body += ["本地宝是第三方线索：政策须核对官方原文；活动时间、费用、名额及报名截止须以主办方公告为准。"]
         if len(hits) > 8:
             body += ["其余线索请查看完整报告。"]
+        if pending_reminders:
+            body += ["", "## 本月需要留意的事情"]
+            for reminder in pending_reminders:
+                body += ["", "**" + reminder["title"] + "**", reminder["timing"],
+                         reminder["action"], "官方依据/查询：" + reminder["source"]]
+            body += ["", "以上按已核验的通用规则及建议检查节奏生成，不表示已实时确认所有当年期限；请以官方当年通知为准。"]
         if failed:
             body += ["", "未完成检查的来源："] + ["- " + x for x in failed]
         body += ["", "[查看完整报告（需登录你的GitHub账号）](" + report_url + ")", "",
                  "仅按标题规则筛选，可能漏检；是否适用、发布日期及办理期限以官方原文为准。"]
         state.setdefault("outbox", []).append({"title": title, "body": "\n".join(body), "created_at": stamp})
+        for reminder in pending_reminders:
+            state.setdefault("calendar_enqueued", {})[reminder["key"]] = stamp
         if failed:
             state["last_error_alert"] = error_signature
     state["activation_recorded"] = True

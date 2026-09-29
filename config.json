@@ -1,6 +1,6 @@
 {
   "repository": "xinyingkang888-glitch/policy-monitor",
-  "scope_note": "只监测配置的官方网页中可读取的文章标题和链接；不是全网或所有政策的完整覆盖。新增链接不等同于新颁布政策，适用条件、生效日和截止日请核实官方原文。",
+  "scope_note": "监测所配置的官方网页和上海、成都本地宝公开网页标题及链接；本地宝为第三方线索，不代表官方政策认定。不是全网完整覆盖，新增链接不等于新颁布政策或活动仍可报名。",
   "profile_note": "上海工作参保、成都户籍及住房；上海租房；非全日制硕士双证；父母在哈尔滨参保。规则匹配仅产生待核实线索。",
   "categories": [
     {
@@ -66,13 +66,95 @@
         "存款保险"
       ],
       "reason": "关注官方发行和规则变化；不自动判断投资收益或执行交易。"
+    },
+    {
+      "name": "地方特色活动",
+      "keywords": [
+        "市集",
+        "灯会",
+        "灯光秀",
+        "烟花",
+        "无人机",
+        "展览",
+        "艺术节",
+        "音乐节",
+        "文化节",
+        "旅游节",
+        "花展",
+        "赏花",
+        "非遗",
+        "免费开放",
+        "免费门票",
+        "免票",
+        "博物馆",
+        "周末活动",
+        "国庆活动",
+        "跨年活动",
+        "节庆"
+      ],
+      "reason": "关注上海、成都地方文化和特色活动；参与前核对主办方、时间地点、价格及报名截止，尚未确认是否仍有名额。"
+    },
+    {
+      "name": "地方消费优惠与补贴",
+      "keywords": [
+        "消费券",
+        "文旅券",
+        "以旧换新",
+        "购新补贴",
+        "消费补贴",
+        "惠民",
+        "惠游"
+      ],
+      "reason": "关注两地可节省生活和出游成本的优惠；核实适用城市、资格、可用商户、领取窗口及实际消费需要。"
+    },
+    {
+      "name": "本地体育赛事",
+      "keywords": [
+        "排球",
+        "女排",
+        "男排",
+        "沙排",
+        "沙滩排球",
+        "篮球",
+        "足球",
+        "网球",
+        "羽毛球",
+        "乒乓球",
+        "马拉松",
+        "体育赛事",
+        "观赛",
+        "赛程",
+        "体育比赛"
+      ],
+      "reason": "关注上海、成都可观看或参与的赛事，尤其排球。核实举办城市、场馆、比赛日期、对阵、票价和官方购票或报名入口；赛果新闻不等于有可参与的新场次。"
+    },
+    {
+      "name": "演唱会与现场演出",
+      "keywords": [
+        "演唱会",
+        "巡演",
+        "音乐会",
+        "音乐剧",
+        "话剧",
+        "戏剧节",
+        "脱口秀",
+        "Livehouse",
+        "livehouse",
+        "开票",
+        "加场",
+        "预售",
+        "演出安排",
+        "演出日历"
+      ],
+      "reason": "关注上海、成都演唱会和现场演出、开票及加场消息。核实艺人、场馆、场次日期、开票时间、票价和主办方授权售票渠道；不自动购票，也不保证尚有余票。"
     }
   ],
   "sources": [
     {
       "id": "sh_housing",
       "name": "上海住房公积金规范性文件",
-      "url": "https://www.shzfgjj.cn/html/newxxgk/zcwj/gfxwj/index.html"
+      "url": "https://www.shzfgjj.cn/html/newxxgk/zcwj/gfxwj/index.html",
+      "use_curl_fallback": true
     },
     {
       "id": "sh_hr",
@@ -117,12 +199,155 @@
     {
       "id": "sc_housing",
       "name": "四川省级公积金中心（含成都政策转载，非成都完整覆盖）",
-      "url": "https://www.scsjgjj.cn/"
+      "url": "https://www.scsjgjj.cn/",
+      "use_curl_fallback": true
+    },
+    {
+      "id": "sh_housing_database",
+      "name": "上海行政规范性文件数据库（公积金补充来源，不替代原站）",
+      "url": "https://service.shanghai.gov.cn/xingzhengwendangkujyh/XZGFList.aspx?departid1=CITY_03",
+      "article_pattern": "/XZGFDetails\\.aspx\\?docid="
+    },
+    {
+      "id": "bendibao_sh_home",
+      "name": "上海本地宝·综合（第三方线索）",
+      "url": "https://sh.bendibao.com/",
+      "source_type": "secondary",
+      "city": "上海",
+      "use_curl_fallback": true
+    },
+    {
+      "id": "bendibao_sh_news",
+      "name": "上海本地宝·资讯（第三方线索）",
+      "url": "https://sh.bendibao.com/news/",
+      "source_type": "secondary",
+      "city": "上海",
+      "use_curl_fallback": true
+    },
+    {
+      "id": "bendibao_sh_events",
+      "name": "上海本地宝·休闲活动（第三方线索）",
+      "url": "https://sh.bendibao.com/xiuxian/",
+      "source_type": "secondary",
+      "city": "上海",
+      "use_curl_fallback": true
+    },
+    {
+      "id": "bendibao_cd_home",
+      "name": "成都本地宝·综合（第三方线索）",
+      "url": "https://cd.bendibao.com/",
+      "source_type": "secondary",
+      "city": "成都",
+      "use_curl_fallback": true
+    },
+    {
+      "id": "bendibao_cd_news",
+      "name": "成都本地宝·资讯（第三方线索）",
+      "url": "https://cd.bendibao.com/news/",
+      "source_type": "secondary",
+      "city": "成都",
+      "use_curl_fallback": true
+    },
+    {
+      "id": "bendibao_cd_events",
+      "name": "成都本地宝·休闲活动（第三方线索）",
+      "url": "https://cd.bendibao.com/xiuxian/",
+      "source_type": "secondary",
+      "city": "成都",
+      "use_curl_fallback": true
     }
   ],
   "coverage_gaps": [
     "成都与哈尔滨市级政策尚无完整专门栏目覆盖，省级信息不能代替市级政策核实。",
     "仅按标题关键词筛选；标题未命中、仅正文修改、附件内容和首页已下架的文章可能漏检。",
-    "每月检查不能保证赶上月内短期申报或国债发行窗口。"
-  ]
+    "每月检查不能保证赶上月内短期申报或国债发行窗口。",
+    "本地宝政策和活动仅为第三方线索，未自动提取或校验举办时间、费用、报名截止及名额；每月频率会漏掉短期活动。"
+  ],
+  "calendar": [
+    {
+      "id": "income_tax",
+      "months": [
+        3,
+        4,
+        5
+      ],
+      "title": "办理{previous_year}年度个税汇算",
+      "timing": "现行一般办理期为{year}年3月1日至6月30日；预约安排以当年公告为准。",
+      "action": "在个人所得税App核对收入、已缴税额和扣除记录；重点检查租房或房贷利息、赡养老人以及MBA在读期间可能涉及的继续教育扣除。先确认资格及夫妻分配，不能把退税视为必然；已完成可忽略或登记完成。",
+      "source": "https://www.chinatax.gov.cn/chinatax/n810341/n810760/c3964127/content.html",
+      "verified_on": "2026-09-30"
+    },
+    {
+      "id": "income_tax",
+      "months": [
+        6
+      ],
+      "title": "{previous_year}年度个税汇算进入最后一个月",
+      "timing": "现行一般汇算期截至{year}年6月30日；这是通常申报期，不能解释为此后任何退税都不能申请。",
+      "action": "如尚未完成，核对是否需要办理汇算及是否存在应补税款；如已申请退税，检查受理状态和收款银行卡。不要重复申报；已完成可登记完成。",
+      "source": "https://fgk.chinatax.gov.cn/zcfgk/c100011/c5238560/5238560/files/f82f550f90d54fa4bbccf2f3d0c3840f.pdf",
+      "verified_on": "2026-09-30"
+    },
+    {
+      "id": "deduction_confirmation",
+      "months": [
+        12
+      ],
+      "title": "确认{next_year}年度专项附加扣除信息",
+      "timing": "每年12月确认下一年度由单位继续办理的专项附加扣除；错过不代表永久失去扣除资格。",
+      "action": "在个人所得税App核对并确认下一年度信息，检查租赁地址、夫妻住房扣除分配及赡养老人资格。MBA已经毕业，不能不加核实就将继续教育扣除照搬到下一年。",
+      "source": "https://shanxi.chinatax.gov.cn/web/detail/sx-11400-548-1816080",
+      "verified_on": "2026-09-30"
+    },
+    {
+      "id": "pension_review",
+      "months": [
+        11,
+        12
+      ],
+      "title": "复核{year}年度个人养老金缴费与扣除",
+      "timing": "年末规划提醒，并非强制缴费事项；按实际缴费年度核对可扣除金额。",
+      "action": "如考虑缴存，先结合今年应税收入、实际边际税率和资金使用计划评估是否划算，再核对已缴金额及凭证。不要为了额度而盲目缴满；已缴者检查扣除记录。",
+      "source": "https://fgk.chinatax.gov.cn/zcfgk/c100016/c5237114/content.html",
+      "verified_on": "2026-09-30"
+    },
+    {
+      "id": "parents_insurance",
+      "months": [
+        9,
+        10,
+        11,
+        12
+      ],
+      "title": "核实父母{next_year}年度医保参保缴费安排",
+      "timing": "秋冬为建议检查时段，不是已确认的哈尔滨集中缴费期；具体金额和期限须查当地当年通知。",
+      "action": "先确认爸爸妈妈分别是职工医保还是居民医保。仅在居民医保等需要年度缴费的情况下，核实哈尔滨下一年度缴费安排及是否已缴；职工或退休医保不要套用居民医保缴费要求。",
+      "source": "https://ybj.hlj.gov.cn/",
+      "verified_on": "2026-09-30"
+    },
+    {
+      "id": "residence_date",
+      "months": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "once_per_year": true,
+      "title": "补齐上海居住证签注日期",
+      "timing": "上海居住证每年签注；应核查有效期限及签注状态。具体个人到期日尚未提供，当前不推算倒计时。",
+      "action": "查看随申办中的居住证有效期限和签注状态，记下到期日期。现行规则要求在期限届满前30日内办理签注；是否已自动签注以系统显示为准。提供具体日期后才能定制个人提醒。",
+      "source": "https://www.shanghai.gov.cn/nw12344/20230214/c799ae0d9f6c4b02a9c15a96b483bdcd.html",
+      "verified_on": "2026-09-30"
+    }
+  ],
+  "completed_tasks": []
 }
