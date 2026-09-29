@@ -1,0 +1,68 @@
+name: WeChat connection test
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  test-wechat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Send one test notification
+        env:
+          SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
+        shell: python
+        run: |
+          import json
+          import os
+          import re
+          import sys
+          import urllib.parse
+          import urllib.request
+          from datetime import datetime, timezone, timedelta
+
+          key = os.environ.get("SERVERCHAN_SENDKEY", "").strip()
+          if not re.fullmatch(r"SCT[0-9A-Za-z]+", key):
+              print("ERROR: Missing or invalid SERVERCHAN_SENDKEY repository secret.")
+              sys.exit(1)
+
+          now = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+          body = urllib.parse.urlencode({
+              "title": "政策小灵通：云端微信测试",
+              "desp": (
+                  "这是一条由 GitHub 云端发送的测试消息。\n\n"
+                  "北京时间：" + now + "\n\n"
+                  "收到这条消息说明云端通知通道可用，不依赖个人电脑开机。\n\n"
+                  "当前仅测试通知，政策监测和每月定时尚未启用。"
+              ),
+          }).encode("utf-8")
+
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+
+          request = urllib.request.Request(
+              "https://sctapi.ftqq.com/" + key + ".send",
+              data=body,
+              headers={"Content-Type": "application/x-www-form-urlencoded"},
+              method="POST",
+          )
+          try:
+              opener = urllib.request.build_opener(NoRedirect())
+              with opener.open(request, timeout=30) as response:
+                  result = json.loads(response.read(65536).decode("utf-8"))
+              if result.get("code") != 0 or result.get("data", {}).get("error") != "SUCCESS":
+                  print("ERROR: Provider did not confirm acceptance. Check ServerChan account and quota.")
+                  sys.exit(1)
+          except Exception:
+              print("ERROR: Notification request failed. Check ServerChan and retry later.")
+              sys.exit(1)
+
+          print("SUCCESS: ServerChan accepted the test. Please check WeChat delivery.")
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as f:
+                  f.write("## 微信测试\nServer酱已接受发送请求。请在微信确认是否收到。\n\n"
+                          "此工作流仅手动执行；尚未启用政策监测或定时任务。\n")
