@@ -1,0 +1,72 @@
+name: Monthly policy monitor
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Force a fresh scan even if this month already completed"
+        type: boolean
+        default: false
+  schedule:
+    # UTC 01:17 = Asia/Shanghai 09:17. Days 2 and 3 retry incomplete runs.
+    - cron: '17 1 1,2,3 * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: policy-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Check uploaded files
+        run: |
+          python -m py_compile monitor.py
+          python -c "import json; json.load(open('config.json', encoding='utf-8-sig'))"
+      - name: Collect official policy links
+        id: scan
+        env:
+          FORCE_SCAN: ${{ inputs.force }}
+        run: |
+          if [ "$FORCE_SCAN" = "true" ]; then
+            python monitor.py scan --force
+          else
+            python monitor.py scan
+          fi
+      - name: Save report and pending notification before sending
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data reports latest-report.md
+          if ! git diff --cached --quiet; then
+            git commit -m "Save policy scan and pending notification"
+            git push origin HEAD:main
+          fi
+      - name: Send meaningful changes or failures to WeChat
+        id: send
+        env:
+          SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
+        run: python monitor.py send
+      - name: Save delivery state
+        if: always() && steps.send.outcome == 'success'
+        run: |
+          git add data/state.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Save notification acceptance"
+            git push origin HEAD:main
+          fi
+      - name: Flag incomplete source coverage
+        if: always() && steps.scan.outcome == 'success'
+        run: python monitor.py health
+
