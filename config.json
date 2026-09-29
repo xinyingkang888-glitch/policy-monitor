@@ -1,0 +1,128 @@
+{
+  "repository": "xinyingkang888-glitch/policy-monitor",
+  "scope_note": "只监测配置的官方网页中可读取的文章标题和链接；不是全网或所有政策的完整覆盖。新增链接不等同于新颁布政策，适用条件、生效日和截止日请核实官方原文。",
+  "profile_note": "上海工作参保、成都户籍及住房；上海租房；非全日制硕士双证；父母在哈尔滨参保。规则匹配仅产生待核实线索。",
+  "categories": [
+    {
+      "name": "公积金与住房",
+      "keywords": [
+        "公积金",
+        "租房提取",
+        "住房租赁",
+        "房贷",
+        "住房贷款",
+        "购房补贴",
+        "契税"
+      ],
+      "reason": "上海缴存公积金、上海租房、成都有纯商贷住房；须核实异地、配偶产权及提取资格。"
+    },
+    {
+      "name": "上海落户与人才",
+      "keywords": [
+        "落户",
+        "居转户",
+        "居住证",
+        "人才引进",
+        "非全日制",
+        "硕士",
+        "人才补贴"
+      ],
+      "reason": "上海工作、持居住证、非全日制硕士双证；须核实单位资格、社保基数和累计年限。"
+    },
+    {
+      "name": "医保与父母保障",
+      "keywords": [
+        "家庭共济",
+        "跨省共济",
+        "医保钱包",
+        "个人账户",
+        "异地就医",
+        "长期护理",
+        "门诊慢",
+        "医疗保险",
+        "医保待遇",
+        "医疗保障待遇",
+        "医保报销"
+      ],
+      "reason": "本人上海参保、父母哈尔滨参保；须核实父母险种、两地开通范围和待遇条件。"
+    },
+    {
+      "name": "个税与养老金",
+      "keywords": [
+        "个人所得税",
+        "专项附加扣除",
+        "汇算",
+        "赡养老人",
+        "住房贷款利息",
+        "个人养老金",
+        "退休年龄"
+      ],
+      "reason": "关注个税扣除、年度汇算及个人养老金规则；实际节税额取决于收入和家庭扣除分配。"
+    },
+    {
+      "name": "政策性储蓄机会",
+      "keywords": [
+        "储蓄国债",
+        "存款保险"
+      ],
+      "reason": "关注官方发行和规则变化；不自动判断投资收益或执行交易。"
+    }
+  ],
+  "sources": [
+    {
+      "id": "sh_housing",
+      "name": "上海住房公积金规范性文件",
+      "url": "https://www.shzfgjj.cn/html/newxxgk/zcwj/gfxwj/index.html"
+    },
+    {
+      "id": "sh_hr",
+      "name": "上海人社局",
+      "url": "https://rsj.sh.gov.cn/"
+    },
+    {
+      "id": "sh_medical",
+      "name": "上海医保局",
+      "url": "https://ybj.sh.gov.cn/"
+    },
+    {
+      "id": "sh_gov",
+      "name": "上海市政府",
+      "url": "https://www.shanghai.gov.cn/"
+    },
+    {
+      "id": "national_medical",
+      "name": "国家医保局",
+      "url": "https://www.nhsa.gov.cn/"
+    },
+    {
+      "id": "hlj_medical",
+      "name": "黑龙江省医保局",
+      "url": "https://ybj.hlj.gov.cn/"
+    },
+    {
+      "id": "national_tax",
+      "name": "国家税务总局",
+      "url": "https://www.chinatax.gov.cn/chinatax/index.html"
+    },
+    {
+      "id": "sh_tax",
+      "name": "上海税务局个税专题",
+      "url": "https://shanghai.chinatax.gov.cn/xwdt/ztzl/zcgll/grsdsggzl/"
+    },
+    {
+      "id": "treasury",
+      "name": "财政部通知通告",
+      "url": "https://www.mof.gov.cn/gkml/bulinggonggao/tongzhitonggao/index.htm"
+    },
+    {
+      "id": "sc_housing",
+      "name": "四川省级公积金中心（含成都政策转载，非成都完整覆盖）",
+      "url": "https://www.scsjgjj.cn/"
+    }
+  ],
+  "coverage_gaps": [
+    "成都与哈尔滨市级政策尚无完整专门栏目覆盖，省级信息不能代替市级政策核实。",
+    "仅按标题关键词筛选；标题未命中、仅正文修改、附件内容和首页已下架的文章可能漏检。",
+    "每月检查不能保证赶上月内短期申报或国债发行窗口。"
+  ]
+}
