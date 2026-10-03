@@ -8,8 +8,8 @@ on:
         type: boolean
         default: false
   schedule:
-# 每月1日北京时间09:17运行一次
-- cron: '17 1 1 * *'
+    # 每月1日北京时间09:17运行一次
+    - cron: '17 1 1 * *'
 
 permissions:
   contents: write
